@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import { env } from "@/config/env";
 
 // Tipos para as configurações do cliente HTTP
 export interface HttpClientConfig {
@@ -163,21 +164,10 @@ export class HttpClient {
   }
 }
 
-// Instância padrão do cliente HTTP
-export const httpClient = new HttpClient();
-
-// Funções de conveniência para usar diretamente
-export const http = {
-  get: <T = any>(url: string, config?: AxiosRequestConfig) => httpClient.get<T>(url, config),
-
-  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => httpClient.post<T>(url, data, config),
-
-  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => httpClient.put<T>(url, data, config),
-
-  delete: <T = any>(url: string, config?: AxiosRequestConfig) => httpClient.delete<T>(url, config),
-
-  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => httpClient.patch<T>(url, data, config),
-};
-
-// Exportação padrão
-export default httpClient;
+export const httpClient = new HttpClient({
+  baseURL: env.API_URL,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
