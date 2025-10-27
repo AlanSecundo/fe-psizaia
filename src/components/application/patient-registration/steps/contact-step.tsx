@@ -1,13 +1,16 @@
 import { FC } from "react";
-import { TextField } from "@/components/base/inputs/text-field";
+import { Control } from "react-hook-form";
+import { TextField, SelectField, PhoneField } from "@/components/base/inputs/form-inputs";
+import { PatientFormData } from "@/types/patientForm";
 
 interface ContactStepProps {
     className?: string;
+    control: Control<PatientFormData>;
 }
 
-export const ContactStep: FC<ContactStepProps> = ({ className }) => {
+export const ContactStep: FC<ContactStepProps> = ({ className, control }) => {
     return (
-        <div className={`space-y-6 ${className || ''}`}>
+        <div className={`${className || ''}`}>
             <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     Contato
@@ -17,40 +20,58 @@ export const ContactStep: FC<ContactStepProps> = ({ className }) => {
                 </p>
             </div>
 
-            <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="mt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                     <TextField
+                        name="contact.email"
+                        control={control}
+                        rules={{
+                            pattern: {
+                                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                                message: 'Email deve ter um formato válido'
+                            }
+                        }}
                         label="Email"
                         type="email"
                         placeholder="patient@example.com"
                     />
 
-                    <TextField
+                    <PhoneField
+                        name="contact.phone"
+                        control={control}
+                        rules={{
+                            required: 'Telefone é obrigatório',
+                            pattern: {
+                                value: /^\(\d{2}\) \d{5}-\d{4}$/,
+                                message: 'Telefone deve estar no formato (XX) XXXXX-XXXX'
+                            }
+                        }}
                         label="Mobile/WhatsApp (Telefone)"
-                        required
-                        type="tel"
                         placeholder="(XX) XXXXX-XXXX"
+                        required
                     />
                 </div>
 
                 <TextField
+                    name="contact.address"
+                    control={control}
                     label="Endereço (opcional)"
                     type="text"
                     placeholder="Rua, número, complemento, bairro"
                 />
 
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Método de Contato Preferido
-                    </label>
-                    <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none focus:outline-none transition-colors">
-                        <option value="">Selecionar método</option>
-                        <option value="email">Email</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="telefone">Telefone</option>
-                        <option value="sms">SMS</option>
-                    </select>
-                </div>
+                <SelectField
+                    name="contact.preferredContactMethod"
+                    control={control}
+                    label="Método de Contato Preferido"
+                    placeholder="Selecionar método"
+                    options={[
+                        { value: "email", label: "Email" },
+                        { value: "whatsapp", label: "WhatsApp" },
+                        { value: "telefone", label: "Telefone" },
+                        { value: "sms", label: "SMS" }
+                    ]}
+                />
             </div>
         </div>
     );

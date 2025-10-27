@@ -1,6 +1,8 @@
 import { FC, useState, useEffect } from "react";
 import { cx } from "@/utils/cx";
 import { X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { PatientFormData } from "@/types/patientForm";
 
 // Import all step components
 import { IdentificationStep } from "./steps/identification-step";
@@ -28,12 +30,64 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
     const [direction, setDirection] = useState<'next' | 'prev'>('next');
     const totalSteps = 6;
 
+    // React Hook Form para gerenciar o formulário completo
+    const { control, getValues, reset } = useForm<PatientFormData>({
+        mode: 'onChange',
+        defaultValues: {
+            identification: {
+                fullName: '',
+                socialName: '',
+                birthDate: '',
+                gender: '',
+                maritalStatus: '',
+                cpf: '',
+                isOver18: false,
+            },
+            contact: {
+                email: '',
+                phone: '',
+                address: '',
+                preferredContactMethod: '',
+            },
+            emergencyContact: {
+                emergencyContactName: '',
+                emergencyContactPhone: '',
+                emergencyContactRelationship: '',
+            },
+            clinicalInfo: {
+                medicalHistory: '',
+                currentMedications: '',
+                allergies: '',
+                hasPsychiatricFollowUp: false,
+                doctorName: '',
+                doctorSpecialty: '',
+            },
+            billingInsurance: {
+                insuranceProvider: '',
+                insuranceNumber: '',
+                hasInsurance: false,
+                insurancePlan: '',
+                insuranceCard: '',
+                document: '',
+                value: '',
+                totalSessions: '',
+                paymentMethodSelected: '',
+            },
+            originNotes: {
+                referralSource: '',
+                notes: '',
+            },
+        }
+    });
+
+
     // Função para resetar o modal para o estado inicial
     const resetModal = () => {
         setCurrentStep(1);
         setShowSuccess(false);
         setIsAnimating(false);
         setDirection('next');
+        reset();
     };
 
     // Função para fechar o modal com reset
@@ -67,6 +121,9 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
     // Função para ir para o próximo passo
     const goToNextStep = () => {
         if (currentStep === totalSteps) {
+            // Submeter formulário quando for o último step
+            const formData = getValues();
+            console.log('Dados do formulário:', formData);
             setShowSuccess(true);
         } else {
             navigateStep(Math.min(totalSteps, currentStep + 1));
@@ -153,32 +210,32 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
                         <>
                             {/* Passo 1: Identificação */}
                             <StepWrapper step={1}>
-                                <IdentificationStep />
+                                <IdentificationStep control={control} />
                             </StepWrapper>
 
                             {/* Passo 2: Contato */}
                             <StepWrapper step={2}>
-                                <ContactStep />
+                                <ContactStep control={control} />
                             </StepWrapper>
 
                             {/* Passo 3: Contato de Emergência */}
                             <StepWrapper step={3}>
-                                <EmergencyContactStep />
+                                <EmergencyContactStep control={control} />
                             </StepWrapper>
 
                             {/* Passo 4: Informações Clínicas */}
                             <StepWrapper step={4}>
-                                <ClinicalInfoStep />
+                                <ClinicalInfoStep control={control} />
                             </StepWrapper>
 
                             {/* Passo 5: Cobrança e Seguro */}
                             <StepWrapper step={5}>
-                                <BillingInsuranceStep />
+                                <BillingInsuranceStep control={control} />
                             </StepWrapper>
 
                             {/* Passo 6: Origem e Notas */}
                             <StepWrapper step={6}>
-                                <OriginNotesStep />
+                                <OriginNotesStep control={control} />
                             </StepWrapper>
                         </>
                     )}
@@ -187,14 +244,17 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
                 {/* Footer */}
                 {!showSuccess && (
                     <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-                        <button
-                            onClick={goToPrevStep}
-                            disabled={currentStep === 1}
-                            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            Anterior
-                        </button>
-
+                        {
+                            currentStep > 1 && (
+                                <button
+                                    onClick={goToPrevStep}
+                                    disabled={currentStep === 1}
+                                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Anterior
+                                </button>
+                            )
+                        }
                         <div className="flex space-x-2">
                             {Array.from({ length: totalSteps }, (_, i) => (
                                 <div
@@ -210,7 +270,12 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
                         <button
                             onClick={goToNextStep}
                             disabled={currentStep > totalSteps}
-                            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className={cx(
+                                "px-4 py-2 rounded-lg transition-colors",
+                                currentStep > totalSteps
+                                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                    : "bg-purple-500 text-white hover:bg-purple-600"
+                            )}
                         >
                             {currentStep === totalSteps ? "Finalizar" : "Próximo"}
                         </button>

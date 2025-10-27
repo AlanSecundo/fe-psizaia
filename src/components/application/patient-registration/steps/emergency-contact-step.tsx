@@ -1,13 +1,17 @@
 import { FC } from "react";
-import { TextField } from "@/components/base/inputs/text-field";
+import { Control } from "react-hook-form";
+import { TextField, SelectField } from "@/components/base/inputs/form-inputs";
+import { PhoneField } from "@/components/base/inputs/phone-field";
+import { PatientFormData } from "@/types/patientForm";
 
 interface EmergencyContactStepProps {
     className?: string;
+    control: Control<PatientFormData>;
 }
 
-export const EmergencyContactStep: FC<EmergencyContactStepProps> = ({ className }) => {
+export const EmergencyContactStep: FC<EmergencyContactStepProps> = ({ className, control }) => {
     return (
-        <div className={`space-y-6 ${className || ''}`}>
+        <div className={`${className || ''}`}>
             <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     Contato de Emergência
@@ -17,8 +21,10 @@ export const EmergencyContactStep: FC<EmergencyContactStepProps> = ({ className 
                 </p>
             </div>
 
-            <div className="space-y-4">
+            <div className="mt-4">
                 <TextField
+                    name="emergencyContact.emergencyContactName"
+                    control={control}
                     label="Nome do Contato de Emergência"
                     required
                     type="text"
@@ -26,28 +32,32 @@ export const EmergencyContactStep: FC<EmergencyContactStepProps> = ({ className 
                 />
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Relacionamento <span className="text-red-500">*</span>
-                    </label>
-                    <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-purple-500 focus:border-purple-500 outline-none focus:outline-none transition-colors">
-                        <option value="">Selecionar relacionamento</option>
-                        <option value="conjuge">Cônjuge</option>
-                        <option value="filho">Filho(a)</option>
-                        <option value="pai">Pai</option>
-                        <option value="mae">Mãe</option>
-                        <option value="irmao">Irmão(ã)</option>
-                        <option value="avos">Avô/Avó</option>
-                        <option value="tio">Tio(a)</option>
-                        <option value="primo">Primo(a)</option>
-                        <option value="amigo">Amigo(a)</option>
-                        <option value="outro">Outro</option>
-                    </select>
+                    <SelectField
+                        name="emergencyContact.emergencyContactRelationship"
+                        control={control}
+                        label="Relacionamento"
+                        placeholder="Selecionar relacionamento"
+                        options={[
+                            { value: "conjuge", label: "Cônjuge" },
+                            { value: "filho", label: "Filho(a)" },
+                            { value: "pai", label: "Pai" },
+                            { value: "mae", label: "Mãe" },
+                            { value: "irmao", label: "Irmão(ã)" },
+                            { value: "avos", label: "Avô/Avó" },
+                            { value: "tio", label: "Tio(a)" },
+                            { value: "primo", label: "Primo(a)" },
+                            { value: "amigo", label: "Amigo(a)" },
+                            { value: "outro", label: "Outro" }
+                        ]}
+                    />
+
                 </div>
 
-                <TextField
+                <PhoneField
+                    name="emergencyContact.emergencyContactPhone"
+                    control={control}
                     label="Telefone de Emergência (Telefone)"
                     required
-                    type="tel"
                     placeholder="(XX) XXXXX-XXXX"
                 />
             </div>

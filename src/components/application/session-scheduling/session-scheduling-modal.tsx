@@ -211,12 +211,12 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-gray-200">
+            <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden border border-gray-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200">
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900">
-                            Cadastro de Sessão
+                            Agendamento de Sessão
                         </h2>
                         <p className="text-sm text-gray-600 mt-1">
                             Preencha os detalhes para agendar uma nova sessão.
@@ -232,7 +232,7 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
 
                 {/* Content */}
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-                    <div className="space-y-6">
+                    <div className="space-y-4">
                         {/* Seleção de Paciente */}
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-medium text-gray-700 w-24">
@@ -261,22 +261,6 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Tipo */}
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium text-gray-700 w-24">
-                                Tipo
-                            </label>
-                            <div className="flex-1 max-w-xs">
-                                <input
-                                    type="text"
-                                    placeholder="Digite o tipo de sessão"
-                                    value={formData.type}
-                                    onChange={(e) => handleInputChange("type", e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                                />
-                            </div>
-                        </div>
-
                         {/* Horário */}
                         <div className="flex items-center justify-between">
                             <label className="text-sm font-medium text-gray-700 w-24">
@@ -292,9 +276,9 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                         </div>
 
                         {/* Modalidade e Duração na mesma linha */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex items-center justify-between">
                             {/* Modalidade */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 flex-grow">
                                 <label className="block text-sm font-medium text-gray-700">
                                     Modalidade
                                 </label>
@@ -310,7 +294,7 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                                         />
                                         <span className="ml-2 text-sm text-gray-700">Online</span>
                                     </label>
-                                    <label className="flex items-center">
+                                    <label className="flex items-center ">
                                         <input
                                             type="radio"
                                             name="modality"
@@ -325,7 +309,7 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                             </div>
 
                             {/* Duração */}
-                            <div className="space-y-3">
+                            <div className="space-y-3 flex-grow">
                                 <label className="block text-sm font-medium text-gray-700">
                                     Duração
                                 </label>

@@ -1,13 +1,23 @@
 import { FC } from "react";
-import { TextField } from "@/components/base/inputs/text-field";
+import { Control, useWatch } from "react-hook-form";
+import { TextField, RadioGroupField } from "@/components/base/inputs/form-inputs";
+import { PatientFormData } from "@/types/patientForm";
+import { PhoneField } from "@/components/base/inputs/phone-field";
 
 interface ClinicalInfoStepProps {
     className?: string;
+    control: Control<PatientFormData>;
 }
 
-export const ClinicalInfoStep: FC<ClinicalInfoStepProps> = ({ className }) => {
+export const ClinicalInfoStep: FC<ClinicalInfoStepProps> = ({ className, control }) => {
+    // Observar o valor do campo hasPsychiatricFollowUp
+    const hasPsychiatricFollowUp = useWatch({
+        control,
+        name: "clinicalInfo.hasPsychiatricFollowUp"
+    });
+
     return (
-        <div className={`space-y-6 ${className || ''}`}>
+        <div className={`${className || ''}`}>
             <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     Informações Clínicas
@@ -17,10 +27,12 @@ export const ClinicalInfoStep: FC<ClinicalInfoStepProps> = ({ className }) => {
                 </p>
             </div>
 
-            <div className="space-y-6">
+            <div className="mt-4">
                 {/* Text Areas Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                     <TextField
+                        name="clinicalInfo.medicalHistory"
+                        control={control}
                         label="Queixa Inicial"
                         multiline
                         rows={4}
@@ -28,6 +40,8 @@ export const ClinicalInfoStep: FC<ClinicalInfoStepProps> = ({ className }) => {
                     />
 
                     <TextField
+                        name="clinicalInfo.currentMedications"
+                        control={control}
                         label="Medicamentos Atuais"
                         multiline
                         rows={4}
@@ -35,31 +49,55 @@ export const ClinicalInfoStep: FC<ClinicalInfoStepProps> = ({ className }) => {
                     />
                 </div>
 
-                {/* Physician Information */}
+                {/* Acompanhamento Psiquiátrico */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <TextField
-                        label="Nome do Médico Atual"
-                        type="text"
-                        placeholder="Nome completo do médico"
+                    <RadioGroupField
+                        name="clinicalInfo.hasPsychiatricFollowUp"
+                        control={control}
+                        label="Realiza acompanhamento psiquiátrico?"
+                        options={[
+                            { value: true, label: "Sim" },
+                            { value: false, label: "Não" }
+                        ]}
                     />
 
-                    <TextField
-                        label="Especialidade do Médico"
-                        type="text"
-                        placeholder="Ex: Cardiologia, Clínica Geral"
-                    />
+                    {/* Nome do Médico Psiquiatra - Condicional */}
+                    {hasPsychiatricFollowUp === true && (
+                        <TextField
+                            name="clinicalInfo.doctorName"
+                            control={control}
+                            label="Nome do Médico Psiquiatra"
+                            type="text"
+                            placeholder="Nome completo do psiquiatra"
+                        />
+                    )}
                 </div>
 
-                <TextField
-                    label="Telefone do Médico (Telefone)"
-                    type="tel"
-                    placeholder="(XX) XXXXX-XXXX"
-                />
+                {/* Especialidade e Telefone do Médico - Condicionais */}
+                {hasPsychiatricFollowUp === true && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <TextField
+                            name="clinicalInfo.doctorSpecialty"
+                            control={control}
+                            label="Especialidade do Médico"
+                            type="text"
+                            placeholder="Ex: Psiquiatria, Psiquiatria Infantil"
+                        />
+
+                        <PhoneField
+                            name="clinicalInfo.doctorPhone"
+                            control={control}
+                            label="Telefone do Médico"
+                            placeholder="(11) 99999-9999"
+                        />
+                    </div>
+                )}
+
 
                 {/* Preferred Time Slots */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-4">
-                        Horários Preferidos
+                        Períodos Preferidos
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <label className="flex items-center">
