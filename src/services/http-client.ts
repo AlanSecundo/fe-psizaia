@@ -40,11 +40,23 @@ export class HttpClient {
     // Interceptor para requisições
     this.axiosInstance.interceptors.request.use(
       (config) => {
-        // Aqui você pode adicionar lógica para tokens de autenticação
-        // const token = localStorage.getItem('token');
-        // if (token) {
-        //   config.headers.Authorization = `Bearer ${token}`;
-        // }
+        // Lista de rotas que não precisam de autenticação
+        const publicRoutes = [
+          "/auth/login",
+          "/users", // cadastro de usuário
+        ];
+
+        // Verificar se a rota atual é pública
+        const isPublicRoute = publicRoutes.some((route) => config.url?.includes(route));
+
+        // Adicionar access token apenas se não for uma rota pública
+        if (!isPublicRoute) {
+          const token = localStorage.getItem("accessToken");
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+
         return config;
       },
       (error) => {

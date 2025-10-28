@@ -1,16 +1,23 @@
 import { useMutation } from "@tanstack/react-query";
 import { httpClient } from "../services";
 import type { UserRegistrationRequest } from "../types/userRegistration";
+import { useAuthentication } from "./useAuthentication";
 
 const registerUser = async (data: UserRegistrationRequest): Promise<void> => {
   await httpClient.post("/users", data);
 };
 
 export const useUserRegistration = () => {
-  const mutation = useMutation({
+  const { login: loginUser, isLoading: isLoginLoading, isSuccess: isLoginSuccess, isError: isLoginError, error: loginError } = useAuthentication();
+
+  const registerMutation = useMutation({
     mutationFn: registerUser,
     onSuccess: (_, variables) => {
-      console.log("Usuário cadastrado com sucesso:", variables);
+      const loginData = {
+        email: variables.email,
+        password: variables.password,
+      };
+      loginUser(loginData);
     },
     onError: (error) => {
       console.error("Erro no cadastro:", error);
@@ -18,11 +25,13 @@ export const useUserRegistration = () => {
   });
 
   return {
-    register: mutation.mutate,
-    isLoading: mutation.isPending,
-    isSuccess: mutation.isSuccess,
-    isError: mutation.isError,
-    error: mutation.error,
-    reset: mutation.reset,
+    register: registerMutation.mutate,
+    isLoading: registerMutation.isPending || isLoginLoading,
+    isSuccess: registerMutation.isSuccess && isLoginSuccess,
+    isError: registerMutation.isError || isLoginError,
+    error: registerMutation.error || loginError,
+    reset: () => {
+      registerMutation.reset();
+    },
   };
 };
