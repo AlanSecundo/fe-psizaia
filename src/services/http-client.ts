@@ -1,5 +1,7 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { env } from "@/config/env";
+import type { RefreshTokenRequest, RefreshTokenResponse } from "@/types/auth";
+import { AuthStorage } from "./auth-storage";
 
 // Tipos para as configurações do cliente HTTP
 export interface HttpClientConfig {
@@ -26,6 +28,50 @@ export interface ApiError {
 // Classe principal do wrapper HTTP
 export class HttpClient {
   private axiosInstance: AxiosInstance;
+  private isRefreshing = false;
+  private failedQueue: Array<{
+    resolve: (value?: any) => void;
+    reject: (reason?: any) => void;
+  }> = [];
+
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach((prom) => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token);
+      }
+    });
+    this.failedQueue = [];
+  }
+
+  private async refreshToken(): Promise<string | null> {
+    const refreshToken = AuthStorage.getRefreshToken();
+    if (!refreshToken) {
+      return null;
+    }
+
+    try {
+      const response = await axios.post<RefreshTokenResponse>(`${env.API_URL}/auth/refresh`, { refreshToken } as RefreshTokenRequest, {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const { accessToken, refreshToken: newRefreshToken } = response.data;
+      AuthStorage.setAccessToken(accessToken);
+      AuthStorage.setRefreshToken(newRefreshToken);
+      return accessToken;
+    } catch (error) {
+      // Se o refresh falhar, limpar tokens
+      AuthStorage.clear();
+      // Redirecionar para login (usando window.location para evitar dependência do router)
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      return null;
+    }
+  }
 
   constructor(config: HttpClientConfig = {}) {
     this.axiosInstance = axios.create({
@@ -39,10 +85,11 @@ export class HttpClient {
 
     // Interceptor para requisições
     this.axiosInstance.interceptors.request.use(
-      (config) => {
+      (config: InternalAxiosRequestConfig) => {
         // Lista de rotas que não precisam de autenticação
         const publicRoutes = [
           "/auth/login",
+          "/auth/refresh",
           "/users", // cadastro de usuário
         ];
 
@@ -51,8 +98,8 @@ export class HttpClient {
 
         // Adicionar access token apenas se não for uma rota pública
         if (!isPublicRoute) {
-          const token = localStorage.getItem("accessToken");
-          if (token) {
+          const token = AuthStorage.getAccessToken();
+          if (token && config.headers) {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
@@ -67,8 +114,79 @@ export class HttpClient {
     // Interceptor para respostas
     this.axiosInstance.interceptors.response.use(
       (response) => response,
-      (error) => {
-        // Tratamento global de erros
+      async (error) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+        // Se for erro 401 e não for uma rota pública, tentar refresh token
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          const publicRoutes = ["/auth/login", "/auth/refresh", "/users"];
+          const isPublicRoute = publicRoutes.some((route) => originalRequest.url?.includes(route));
+
+          if (isPublicRoute) {
+            const apiError: ApiError = {
+              message: error.message || "Erro desconhecido",
+              status: error.response?.status,
+              data: error.response?.data,
+            };
+            return Promise.reject(apiError);
+          }
+
+          // Se já está fazendo refresh, adicionar a requisição na fila
+          if (this.isRefreshing) {
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject });
+            })
+              .then((token) => {
+                if (originalRequest.headers && token) {
+                  originalRequest.headers.Authorization = `Bearer ${token}`;
+                }
+                return this.axiosInstance(originalRequest);
+              })
+              .catch((err) => {
+                return Promise.reject(err);
+              });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const newToken = await this.refreshToken();
+
+            if (!newToken) {
+              this.processQueue(new Error("Falha ao renovar token"), null);
+              const apiError: ApiError = {
+                message: "Sessão expirada. Faça login novamente.",
+                status: 401,
+                data: error.response?.data,
+              };
+              return Promise.reject(apiError);
+            }
+
+            // Atualizar token na requisição original
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            }
+
+            // Processar fila de requisições pendentes
+            this.processQueue(null, newToken);
+            this.isRefreshing = false;
+
+            // Refazer a requisição original
+            return this.axiosInstance(originalRequest);
+          } catch (refreshError) {
+            this.processQueue(refreshError, null);
+            this.isRefreshing = false;
+            const apiError: ApiError = {
+              message: "Erro ao renovar token de autenticação",
+              status: 401,
+              data: error.response?.data,
+            };
+            return Promise.reject(apiError);
+          }
+        }
+
+        // Tratamento global de erros para outros casos
         const apiError: ApiError = {
           message: error.message || "Erro desconhecido",
           status: error.response?.status,

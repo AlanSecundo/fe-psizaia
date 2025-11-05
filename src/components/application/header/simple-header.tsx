@@ -1,6 +1,7 @@
-import { FC } from "react";
+import { FC, useState, useRef, useEffect } from "react";
 import { cx } from "@/utils/cx";
 import useUser from "@/store/useUser.store";
+import { useAuthentication } from "@/hooks";
 
 interface SimpleHeaderProps {
     className?: string;
@@ -8,6 +9,31 @@ interface SimpleHeaderProps {
 
 export const SimpleHeader: FC<SimpleHeaderProps> = ({ className }) => {
     const { user } = useUser();
+    const { logout } = useAuthentication();
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    // Fechar o menu ao clicar fora dele
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsMenuOpen(false);
+            }
+        };
+
+        if (isMenuOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isMenuOpen]);
+
+    const handleLogout = () => {
+        logout();
+        setIsMenuOpen(false);
+    };
 
     return (
         <header className={cx(
@@ -56,15 +82,45 @@ export const SimpleHeader: FC<SimpleHeaderProps> = ({ className }) => {
                         <span className="text-sm font-medium">Ajuda</span>
                     </button>
 
-                    {/* Avatar do usuário */}
-                    <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            <img
-                                src={user.image}
-                                alt="Foto do usuário"
-                                className="w-full h-full object-cover"
-                            />
-                        </div>
+                    {/* Avatar do usuário com menu */}
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            onClick={() => setIsMenuOpen(!isMenuOpen)}
+                            className="flex items-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 rounded-full"
+                        >
+                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-300 transition-all">
+                                <img
+                                    src={user.image}
+                                    alt="Foto do usuário"
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                        </button>
+
+                        {/* Menu dropdown */}
+                        {isMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors flex items-center space-x-2"
+                                >
+                                    <svg
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                                        />
+                                    </svg>
+                                    <span>Sair</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

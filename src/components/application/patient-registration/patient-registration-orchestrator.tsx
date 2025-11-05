@@ -3,6 +3,8 @@ import { cx } from "@/utils/cx";
 import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { PatientFormData } from "@/types/patientForm";
+import { usePatientRegistration } from "@/hooks";
+import { mapFormDataToApiRequest } from "@/utils/patient-form-mapper";
 
 // Import all step components
 import { IdentificationStep } from "./steps/identification-step";
@@ -29,6 +31,9 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
     const [isAnimating, setIsAnimating] = useState(false);
     const [direction, setDirection] = useState<'next' | 'prev'>('next');
     const totalSteps = 6;
+
+    // Hook para cadastro de pacientes
+    const { registerPatient, isLoading, isSuccess, isError, error } = usePatientRegistration();
 
     // React Hook Form para gerenciar o formulário completo
     const { control, getValues, reset } = useForm<PatientFormData>({
@@ -103,6 +108,13 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
         }
     }, [isOpen]);
 
+    // Mostrar tela de sucesso quando o cadastro for bem-sucedido
+    useEffect(() => {
+        if (isSuccess) {
+            setShowSuccess(true);
+        }
+    }, [isSuccess]);
+
     // Função para navegar entre passos com animação
     const navigateStep = (newStep: number) => {
         if (isAnimating) return;
@@ -124,7 +136,12 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
             // Submeter formulário quando for o último step
             const formData = getValues();
             console.log('Dados do formulário:', formData);
-            setShowSuccess(true);
+
+            // Mapear dados do formulário para o formato da API
+            const apiRequest = mapFormDataToApiRequest(formData, "8b55cc21-8865-4beb-8054-e464f41a1662"); // TODO: Pegar ID do psicólogo do contexto/estado
+
+            // Chamar a API para cadastrar o paciente
+            registerPatient(apiRequest);
         } else {
             navigateStep(Math.min(totalSteps, currentStep + 1));
         }
@@ -192,9 +209,29 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
 
                 {/* Content */}
                 <div className="p-6 overflow-y-auto overflow-x-hidden max-h-[calc(90vh-200px)]">
+                    {/* Error Message */}
+                    {isError && (
+                        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <div className="flex items-center">
+                                <div className="w-5 h-5 text-red-500 mr-2">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-medium text-red-800">Erro no cadastro</h4>
+                                    <p className="text-sm text-red-600 mt-1">
+                                        {error?.message || "Ocorreu um erro ao cadastrar o paciente. Tente novamente."}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Success Screen */}
                     {showSuccess ? (
                         <SuccessStep
+                            patientName={getValues().identification.fullName}
                             onClose={handleClose}
                             onScheduleSession={() => {
                                 handleClose(); // Fecha o modal de cadastro
@@ -269,15 +306,18 @@ export const PatientRegistrationOrchestrator: FC<PatientRegistrationOrchestrator
 
                         <button
                             onClick={goToNextStep}
-                            disabled={currentStep > totalSteps}
+                            disabled={currentStep > totalSteps || isLoading}
                             className={cx(
-                                "px-4 py-2 rounded-lg transition-colors",
-                                currentStep > totalSteps
+                                "px-4 py-2 rounded-lg transition-colors flex items-center gap-2",
+                                currentStep > totalSteps || isLoading
                                     ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                                     : "bg-purple-500 text-white hover:bg-purple-600"
                             )}
                         >
-                            {currentStep === totalSteps ? "Finalizar" : "Próximo"}
+                            {isLoading && (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            )}
+                            {currentStep === totalSteps ? (isLoading ? "Enviando..." : "Finalizar") : "Próximo"}
                         </button>
                     </div>
                 )}

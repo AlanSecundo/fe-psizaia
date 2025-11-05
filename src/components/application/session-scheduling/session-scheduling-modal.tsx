@@ -1,5 +1,8 @@
-import { FC, useState } from "react";
+import { FC, useState, useEffect, useRef } from "react";
 import { X, Calendar, ChevronDown, Clock, User } from "lucide-react";
+import { usePatients, useSchedule } from "@/hooks";
+import type { Patient } from "@/types/patient";
+import type { AvailableSlot } from "@/types/schedule";
 
 interface SessionSchedulingModalProps {
     isOpen: boolean;
@@ -11,39 +14,32 @@ interface RecurrenceOption {
     label: string;
 }
 
-interface Patient {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-}
-
 const recurrenceOptions: RecurrenceOption[] = [
     { value: 'weekly', label: 'Semanal' },
     { value: 'biweekly', label: 'Quinzenal' },
     { value: 'monthly', label: 'Mensal' },
 ];
 
-// Mock data for patients
-const mockPatients: Patient[] = [
-    { id: '1', name: 'Ana Silva', email: 'ana.silva@email.com', phone: '(11) 99999-1111' },
-    { id: '2', name: 'Carlos Santos', email: 'carlos.santos@email.com', phone: '(11) 99999-2222' },
-    { id: '3', name: 'Maria Oliveira', email: 'maria.oliveira@email.com', phone: '(11) 99999-3333' },
-    { id: '4', name: 'João Costa', email: 'joao.costa@email.com', phone: '(11) 99999-4444' },
-    { id: '5', name: 'Fernanda Lima', email: 'fernanda.lima@email.com', phone: '(11) 99999-5555' },
-];
-
-// Time options for time picker
-const timeOptions = [
-    "08:00 - 08:50 ", "09:00 - 09:50 ", "10:00 - 10:50 ", "11:00 - 11:50 ",
-    "12:00 - 12:50 ", "13:00 - 13:50 ", "14:00 - 14:50 ", "15:00 - 15:50 ",
-    "16:00 - 16:50 ", "17:00 - 17:50 ", "18:00 - 18:50 ", "19:00 - 19:50 ",];
-
 // Date picker component
-const DatePicker = ({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) => {
+const DatePicker = ({
+    value,
+    onChange,
+    placeholder,
+    availableSlots,
+    isLoading
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    availableSlots: AvailableSlot[];
+    isLoading: boolean;
+}) => {
     const [isOpen, setIsOpen] = useState(false);
+    const datePickerRef = useRef<HTMLDivElement>(null);
 
-    const formatDate = (date: Date) => {
+    // Converter data da API (YYYY-MM-DD) para formato brasileiro
+    const formatDateFromAPI = (dateString: string) => {
+        const date = new Date(dateString + 'T00:00:00');
         return date.toLocaleDateString('pt-BR', {
             day: '2-digit',
             month: 'long',
@@ -51,13 +47,36 @@ const DatePicker = ({ value, onChange, placeholder }: { value: string; onChange:
         });
     };
 
-    const handleDateSelect = (date: Date) => {
-        onChange(formatDate(date));
+    // Fechar ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isOpen]);
+
+    const handleDateSelect = (dateString: string) => {
+        const formatted = formatDateFromAPI(dateString);
+        onChange(formatted);
         setIsOpen(false);
     };
 
+    // Ordenar datas disponíveis
+    const sortedSlots = [...availableSlots].sort((a, b) =>
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
     return (
-        <div className="relative">
+        <div className="relative" ref={datePickerRef}>
             <input
                 type="text"
                 placeholder={placeholder}
@@ -65,33 +84,43 @@ const DatePicker = ({ value, onChange, placeholder }: { value: string; onChange:
                 readOnly
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors cursor-pointer"
+                disabled={isLoading}
             />
             <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             {isOpen && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4">
-                    <div className="grid grid-cols-7 gap-1 text-center text-sm">
-                        <div className="p-2 font-medium text-gray-500">Dom</div>
-                        <div className="p-2 font-medium text-gray-500">Seg</div>
-                        <div className="p-2 font-medium text-gray-500">Ter</div>
-                        <div className="p-2 font-medium text-gray-500">Qua</div>
-                        <div className="p-2 font-medium text-gray-500">Qui</div>
-                        <div className="p-2 font-medium text-gray-500">Sex</div>
-                        <div className="p-2 font-medium text-gray-500">Sáb</div>
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-4 max-h-96 overflow-y-auto">
+                    {isLoading ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Carregando datas disponíveis...
+                        </div>
+                    ) : sortedSlots.length === 0 ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Nenhuma data disponível
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {sortedSlots.map((slot) => {
+                                const formatted = formatDateFromAPI(slot.date);
+                                const isSelected = value === formatted;
 
-                        {Array.from({ length: 31 }, (_, i) => {
-                            const day = i + 1;
-                            const date = new Date(2025, 9, day); // October 2025
-                            return (
-                                <button
-                                    key={day}
-                                    onClick={() => handleDateSelect(date)}
-                                    className="p-2 hover:bg-purple-50 hover:text-purple-600 rounded transition-colors"
-                                >
-                                    {day}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                return (
+                                    <button
+                                        key={slot.date}
+                                        onClick={() => handleDateSelect(slot.date)}
+                                        className={`w-full px-4 py-3 text-left rounded-lg transition-colors ${isSelected
+                                            ? 'bg-purple-100 text-purple-700 border-2 border-purple-500'
+                                            : 'hover:bg-purple-50 hover:text-purple-600 border border-gray-200'
+                                            }`}
+                                    >
+                                        <div className="font-medium">{formatted}</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            {slot.timeSlots.length} horário(s) disponível(is)
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -99,11 +128,78 @@ const DatePicker = ({ value, onChange, placeholder }: { value: string; onChange:
 };
 
 // Time picker component
-const TimePicker = ({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) => {
+const TimePicker = ({
+    value,
+    onChange,
+    placeholder,
+    selectedDate,
+    availableSlots,
+    isLoading
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    selectedDate: string;
+    availableSlots: AvailableSlot[];
+    isLoading: boolean;
+}) => {
     const [isOpen, setIsOpen] = useState(false);
+    const timePickerRef = useRef<HTMLDivElement>(null);
+
+    // Converter data do formato brasileiro para YYYY-MM-DD
+    const parseDateToAPI = (dateString: string): string | null => {
+        const slot = availableSlots.find(slot => {
+            const date = new Date(slot.date + 'T00:00:00');
+            const formatted = date.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+            return formatted === dateString;
+        });
+        return slot ? slot.date : null;
+    };
+
+    // Formatar horário para exibição (HH:mm - HH:mm)
+    const formatTimeSlot = (startTime: string, endTime: string): string => {
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const startHour = start.getHours().toString().padStart(2, '0');
+        const startMin = start.getMinutes().toString().padStart(2, '0');
+        const endHour = end.getHours().toString().padStart(2, '0');
+        const endMin = end.getMinutes().toString().padStart(2, '0');
+        return `${startHour}:${startMin} - ${endHour}:${endMin}`;
+    };
+
+    // Fechar ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (timePickerRef.current && !timePickerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isOpen]);
+
+    // Obter slots da data selecionada
+    const dateApiFormat = selectedDate ? parseDateToAPI(selectedDate) : null;
+    const selectedSlot = availableSlots.find(slot => slot.date === dateApiFormat);
+    const timeSlots = selectedSlot ? selectedSlot.timeSlots : [];
+
+    // Ordenar horários
+    const sortedTimeSlots = [...timeSlots].sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
 
     return (
-        <div className="relative">
+        <div className="relative" ref={timePickerRef}>
             <input
                 type="text"
                 placeholder={placeholder}
@@ -111,23 +207,46 @@ const TimePicker = ({ value, onChange, placeholder }: { value: string; onChange:
                 readOnly
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors cursor-pointer"
+                disabled={!selectedDate || isLoading}
             />
             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             {isOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {timeOptions.map((time) => (
-                        <button
-                            key={time}
-                            onClick={() => {
-                                onChange(time);
-                                setIsOpen(false);
-                            }}
-                            className="w-full px-3 py-2 text-left hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-center"
-                        >
-                            <Clock className="w-4 h-4 mr-2 text-gray-400" />
-                            {time}
-                        </button>
-                    ))}
+                    {!selectedDate ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Selecione uma data primeiro
+                        </div>
+                    ) : isLoading ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Carregando horários...
+                        </div>
+                    ) : sortedTimeSlots.length === 0 ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Nenhum horário disponível para esta data
+                        </div>
+                    ) : (
+                        sortedTimeSlots.map((timeSlot) => {
+                            const formattedTime = formatTimeSlot(timeSlot.startTime, timeSlot.endTime);
+                            const isSelected = value === formattedTime;
+
+                            return (
+                                <button
+                                    key={`${timeSlot.startTime}-${timeSlot.endTime}`}
+                                    onClick={() => {
+                                        onChange(formattedTime);
+                                        setIsOpen(false);
+                                    }}
+                                    className={`w-full px-3 py-2 text-left transition-colors flex items-center ${isSelected
+                                        ? 'bg-purple-100 text-purple-700'
+                                        : 'hover:bg-purple-50 hover:text-purple-600'
+                                        }`}
+                                >
+                                    <Clock className="w-4 h-4 mr-2 text-gray-400" />
+                                    {formattedTime}
+                                </button>
+                            );
+                        })
+                    )}
                 </div>
             )}
         </div>
@@ -135,9 +254,21 @@ const TimePicker = ({ value, onChange, placeholder }: { value: string; onChange:
 };
 
 // Patient selector component
-const PatientSelector = ({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) => {
+const PatientSelector = ({
+    value,
+    onChange,
+    placeholder,
+    patients,
+    isLoading
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    patients: Patient[];
+    isLoading: boolean;
+}) => {
     const [isOpen, setIsOpen] = useState(false);
-    const selectedPatient = mockPatients.find(patient => patient.id === value);
+    const selectedPatient = patients.find(patient => patient.id === value);
 
     return (
         <div className="relative">
@@ -153,22 +284,30 @@ const PatientSelector = ({ value, onChange, placeholder }: { value: string; onCh
             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             {isOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                    {mockPatients.map((patient) => (
-                        <button
-                            key={patient.id}
-                            onClick={() => {
-                                onChange(patient.id);
-                                setIsOpen(false);
-                            }}
-                            className="w-full px-3 py-3 text-left hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-start border-b border-gray-100 last:border-b-0"
-                        >
-                            <div className="flex-1">
-                                <div className="font-medium text-gray-900">{patient.name}</div>
-                                <div className="text-sm text-gray-500">{patient.email}</div>
-                                <div className="text-sm text-gray-500">{patient.phone}</div>
-                            </div>
-                        </button>
-                    ))}
+                    {isLoading ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Carregando pacientes...
+                        </div>
+                    ) : patients.length === 0 ? (
+                        <div className="px-3 py-3 text-center text-sm text-gray-500">
+                            Nenhum paciente encontrado
+                        </div>
+                    ) : (
+                        patients.map((patient) => (
+                            <button
+                                key={patient.id}
+                                onClick={() => {
+                                    onChange(patient.id);
+                                    setIsOpen(false);
+                                }}
+                                className="w-full px-3 py-3 text-left hover:bg-purple-50 hover:text-purple-600 transition-colors flex items-start border-b border-gray-100 last:border-b-0"
+                            >
+                                <div className="flex-1">
+                                    <div className="font-medium text-gray-900">{patient.name}</div>
+                                </div>
+                            </button>
+                        ))
+                    )}
                 </div>
             )}
         </div>
@@ -179,6 +318,17 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
     isOpen,
     onClose
 }) => {
+    const { patients, isLoading: isLoadingPatients } = usePatients();
+    const {
+        availableSlots,
+        isLoading: isLoadingSlots,
+        scheduleSession,
+        isScheduling,
+        isScheduleSuccess,
+        isScheduleError,
+        scheduleError,
+        resetSchedule
+    } = useSchedule();
     const [formData, setFormData] = useState({
         patientId: "",
         date: "",
@@ -190,6 +340,33 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
         duration: "50"
     });
 
+    // Limpar horário quando a data mudar
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            time: ""
+        }));
+    }, [formData.date]);
+
+    // Fechar modal quando agendamento for bem-sucedido
+    useEffect(() => {
+        if (isScheduleSuccess) {
+            // Resetar formulário
+            setFormData({
+                patientId: "",
+                date: "",
+                type: "",
+                time: "",
+                isRecurring: false,
+                recurrence: "weekly",
+                modality: "online",
+                duration: "50"
+            });
+            resetSchedule();
+            onClose();
+        }
+    }, [isScheduleSuccess, resetSchedule, onClose]);
+
     if (!isOpen) return null;
 
     const handleInputChange = (field: string, value: string | boolean) => {
@@ -199,14 +376,75 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
         }));
     };
 
-    const handleSubmit = () => {
-        const selectedPatient = mockPatients.find(patient => patient.id === formData.patientId);
-        console.log("Dados do agendamento:", {
-            ...formData,
-            patient: selectedPatient
+    // Converter data do formato brasileiro para YYYY-MM-DD
+    const parseDateToAPI = (dateString: string): string | null => {
+        const slot = availableSlots.find(slot => {
+            const date = new Date(slot.date + 'T00:00:00');
+            const formatted = date.toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+            return formatted === dateString;
         });
-        // TODO: Implementar lógica de agendamento
-        onClose();
+        return slot ? slot.date : null;
+    };
+
+    // Converter horário formatado (HH:mm - HH:mm) para ISO datetime
+    const parseTimeToDateTime = (dateString: string, timeString: string): string | null => {
+        const dateApiFormat = parseDateToAPI(dateString);
+        if (!dateApiFormat) return null;
+
+        // Extrair horário de início do formato "HH:mm - HH:mm"
+        const startTime = timeString.split(' - ')[0];
+        const [hours, minutes] = startTime.split(':').map(Number);
+
+        // Criar data ISO com o horário
+        const date = new Date(dateApiFormat);
+        date.setHours(hours, minutes, 0, 0);
+
+        return date.toISOString();
+    };
+
+    // Converter modalidade para o formato da API
+    const convertModalityToType = (modality: string): "IN_PERSON" | "ONLINE" => {
+        return modality === "presencial" ? "IN_PERSON" : "ONLINE";
+    };
+
+    const handleSubmit = () => {
+        // Validações
+        if (!formData.patientId) {
+            alert("Por favor, selecione um paciente");
+            return;
+        }
+
+        if (!formData.date) {
+            alert("Por favor, selecione uma data");
+            return;
+        }
+
+        if (!formData.time) {
+            alert("Por favor, selecione um horário");
+            return;
+        }
+
+        // Converter dados para o formato da API
+        const scheduledDateTime = parseTimeToDateTime(formData.date, formData.time);
+        if (!scheduledDateTime) {
+            alert("Erro ao processar data e horário");
+            return;
+        }
+
+        const scheduleData = {
+            patientId: formData.patientId,
+            scheduledDateTime: scheduledDateTime,
+            durationMinutes: parseInt(formData.duration, 10),
+            type: convertModalityToType(formData.modality),
+            notes: undefined,
+            isRecurring: formData.isRecurring
+        };
+
+        scheduleSession(scheduleData);
     };
 
     return (
@@ -243,6 +481,8 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                                     value={formData.patientId}
                                     onChange={(value) => handleInputChange("patientId", value)}
                                     placeholder="Selecione um paciente"
+                                    patients={patients}
+                                    isLoading={isLoadingPatients}
                                 />
                             </div>
                         </div>
@@ -257,6 +497,8 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                                     value={formData.date}
                                     onChange={(value) => handleInputChange("date", value)}
                                     placeholder="Selecione a data"
+                                    availableSlots={availableSlots}
+                                    isLoading={isLoadingSlots}
                                 />
                             </div>
                         </div>
@@ -271,6 +513,9 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
                                     value={formData.time}
                                     onChange={(value) => handleInputChange("time", value)}
                                     placeholder="Selecione o horário"
+                                    selectedDate={formData.date}
+                                    availableSlots={availableSlots}
+                                    isLoading={isLoadingSlots}
                                 />
                             </div>
                         </div>
@@ -381,17 +626,24 @@ export const SessionSchedulingModal: FC<SessionSchedulingModalProps> = ({
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-4 p-6 border-t border-gray-200 bg-gray-50">
+                    {isScheduleError && (
+                        <div className="flex-1 text-sm text-red-600">
+                            {scheduleError?.message || "Erro ao agendar sessão. Tente novamente."}
+                        </div>
+                    )}
                     <button
                         onClick={onClose}
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        disabled={isScheduling}
                     >
                         Cancelar
                     </button>
                     <button
                         onClick={handleSubmit}
-                        className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                        disabled={isScheduling || !formData.patientId || !formData.date || !formData.time}
+                        className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Agendar Sessão
+                        {isScheduling ? "Agendando..." : "Agendar Sessão"}
                     </button>
                 </div>
             </div>

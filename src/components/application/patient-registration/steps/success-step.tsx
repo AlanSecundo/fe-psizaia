@@ -1,12 +1,13 @@
 import { FC } from "react";
 
 interface SuccessStepProps {
+    patientName: string;
     onClose: () => void;
     onScheduleSession: () => void;
     className?: string;
 }
 
-export const SuccessStep: FC<SuccessStepProps> = ({ onClose, onScheduleSession, className }) => {
+export const SuccessStep: FC<SuccessStepProps> = ({ patientName, onClose, onScheduleSession, className }) => {
     return (
         <div className={`text-center py-8 ${className || ''}`}>
             <div className="mb-6">
@@ -19,7 +20,7 @@ export const SuccessStep: FC<SuccessStepProps> = ({ onClose, onScheduleSession, 
                     Cadastro Concluído!
                 </h3>
                 <p className="text-gray-600 mb-6">
-                    Alan Secundo agora é seu paciente! Você gostaria de agendar as sessões?
+                    {patientName} agora é seu paciente! Você gostaria de agendar as sessões?
                 </p>
             </div>
 
